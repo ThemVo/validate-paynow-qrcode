@@ -696,4 +696,83 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.getElementById('paynow-info-grid').innerHTML = html;
     }
+
+    // ==========================================
+    // Auto-load QR from URL param ?qr=<url>
+    // ==========================================
+    (function initFromUrlParam() {
+        const params = new URLSearchParams(window.location.search);
+        const qrUrl = params.get('qr');
+        if (!qrUrl) return;
+
+        // Switch to upload tab so decodedQRString is used on validate
+        switchTab('upload');
+
+        showDecodeStatus('success', 'Đang xử lý ảnh QR...');
+
+        const logoImg = document.getElementById('logo-qr-img');
+
+        function captureAndDecode() {
+            if (typeof html2canvas === 'undefined') {
+                showDecodeStatus('error', 'html2canvas library not loaded.');
+                return;
+            }
+
+            // Chụp element logo-qr-img ngay trên UI
+            html2canvas(logoImg, {
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: null,
+                scale: 2, // scale cao để ảnh QR sắc nét hơn khi decode
+            }).then(function (capturedCanvas) {
+                const ctx = qrCanvas.getContext('2d');
+
+                const w = capturedCanvas.width;
+                const h = capturedCanvas.height;
+
+                qrCanvas.width = w;
+                qrCanvas.height = h;
+                ctx.drawImage(capturedCanvas, 0, 0);
+
+                const imageData = ctx.getImageData(0, 0, w, h);
+
+                if (typeof jsQR === 'undefined') {
+                    showDecodeStatus('error', 'jsQR library not loaded.');
+                    return;
+                }
+
+                let code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: 'dontInvert',
+                });
+
+                if (!code) {
+                    code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: 'attemptBoth',
+                    });
+                }
+
+                if (code) {
+                    decodedQRString = code.data;
+                    decodedBadge.style.display = 'inline-flex';
+                    showDecodeStatus('success',
+                        `QR decoded thành công:<span class="decoded-string">${escapeHtml(decodedQRString)}</span>`
+                    );
+                } else {
+                    showDecodeStatus('error', 'Không thể decode QR từ ảnh. Thử paste chuỗi data thủ công.');
+                }
+            }).catch(function (err) {
+                showDecodeStatus('error', 'Lỗi khi chụp ảnh: ' + err.message);
+            });
+        }
+
+        // Đợi ảnh hiển thị xong rồi mới chụp
+        if (logoImg.complete && logoImg.naturalWidth > 0) {
+            captureAndDecode();
+        } else {
+            logoImg.addEventListener('load', captureAndDecode, { once: true });
+            logoImg.addEventListener('error', () => {
+                showDecodeStatus('error', 'Không thể tải ảnh từ URL.');
+            }, { once: true });
+        }
+    })();
 });

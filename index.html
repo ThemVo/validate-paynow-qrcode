@@ -17,8 +17,8 @@
 
     <main class="container">
         <header class="header">
-            <div class="logo">
-                <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+            <div class="logo" id="logo-container">
+                <svg id="logo-svg" width="40" height="40" viewBox="0 0 40 40" fill="none">
                     <rect width="40" height="40" rx="12" fill="url(#logo-grad)"/>
                     <path d="M12 12h6v6h-6zM22 12h6v6h-6zM12 22h6v6h-6zM24 24h4v4h-4z" fill="white" opacity="0.9"/>
                     <path d="M22 22h2v2h-2z" fill="white" opacity="0.5"/>
@@ -29,6 +29,7 @@
                         </linearGradient>
                     </defs>
                 </svg>
+                <img id="logo-qr-img" src="" alt="QR Code" style="display:none;width:375px;height:375px;object-fit:contain;">
             </div>
             <h1>PayNow QR Validator</h1>
             <p class="subtitle">Upload a QR image or paste the data string to validate EMVCo / SGQR compliance</p>
@@ -178,5 +179,37 @@
     <canvas id="qr-canvas" style="display:none;"></canvas>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script src="script.js"></script>
+    <script>
+        // Handle ?qr=<url> param: show QR image instead of SVG logo
+        (function () {
+            const params = new URLSearchParams(window.location.search);
+            const qrUrl = params.get('qr');
+            if (qrUrl) {
+                const logoSvg = document.getElementById('logo-svg');
+                const logoQrImg = document.getElementById('logo-qr-img');
+                const logoContainer = document.getElementById('logo-container');
+                if (logoSvg) logoSvg.style.display = 'none';
+                if (logoQrImg) {
+                    logoQrImg.src = qrUrl;
+                    logoQrImg.style.display = 'block';
+                }
+                // Adjust header layout for large QR image
+                if (logoContainer) {
+                    logoContainer.style.display = 'flex';
+                    logoContainer.style.justifyContent = 'center';
+                    logoContainer.style.width = '100%';
+                    // Tắt animation pulse-glow (nền xanh blur)
+                    logoContainer.style.animation = 'none';
+                    logoContainer.style.filter = 'none';
+                }
+                const header = document.querySelector('.header');
+                if (header) {
+                    header.style.flexDirection = 'column';
+                    header.style.alignItems = 'center';
+                    header.style.textAlign = 'center';
+                }
+            }
+        })();
+    </script>
 </body>
 </html>
