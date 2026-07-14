@@ -447,7 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Use jsQR to decode
             if (typeof jsQR === 'undefined') {
-                showDecodeStatus('error', 'jsQR library not loaded. Please check your internet connection.');
+                showDecodeStatusText('error', 'jsQR library not loaded. Please check your internet connection.');
                 return;
             }
 
@@ -475,17 +475,28 @@ document.addEventListener('DOMContentLoaded', () => {
                     );
                 } else {
                     decodedQRString = '';
-                    showDecodeStatus('error', 'Could not detect a QR code in this image. Try a clearer image or paste the data string manually.');
+                    showDecodeStatusText('error', 'Could not detect a QR code in this image. Try a clearer image or paste the data string manually.');
                 }
             }
         };
         img.src = dataUrl;
     }
 
-    function showDecodeStatus(type, message) {
+    function showDecodeStatus(type, htmlContent) {
         decodeStatus.style.display = 'block';
         decodeStatus.className = `decode-status decode-${type}`;
-        decodeStatus.innerHTML = message;
+        // Use textContent for safety; callers that need rich content
+        // should pre-build escaped HTML via escapeHtml().
+        decodeStatus.innerHTML = htmlContent;
+    }
+
+    /**
+     * Safe version: shows a plain-text status message (no HTML injection risk).
+     */
+    function showDecodeStatusText(type, message) {
+        decodeStatus.style.display = 'block';
+        decodeStatus.className = `decode-status decode-${type}`;
+        decodeStatus.textContent = message;
     }
 
     // ==========================================
@@ -533,7 +544,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!qrString) {
             if (activeTab === 'upload') {
-                showDecodeStatus('error', 'Please upload a QR code image first.');
+                showDecodeStatusText('error', 'Please upload a QR code image first.');
             }
         }
 
@@ -568,13 +579,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border-default);">
                         <span style="flex-shrink:0;">${icon}</span>
                         <div>
-                            <span style="font-weight:600;color:${color};font-size:0.85rem;">${check.name}</span>
-                            <span style="color:var(--text-muted);font-size:0.8rem;margin-left:8px;">${check.detail}</span>
+                            <span style="font-weight:600;color:${color};font-size:0.85rem;">${escapeHtml(check.name)}</span>
+                            <span style="color:var(--text-muted);font-size:0.8rem;margin-left:8px;">${escapeHtml(check.detail)}</span>
                         </div>
                     </div>`;
             });
             checksHtml += '</div>';
-            resultMessage.innerHTML = (result.message || result.reason || '') + checksHtml;
+            resultMessage.innerHTML = escapeHtml(result.message || result.reason || '') + checksHtml;
         }
 
         // Render PayNow Info Card
@@ -600,9 +611,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const name = TAG_NAMES[tag] || '—';
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td><span class="tag-badge">${tag}</span></td>
-                    <td><span class="tag-name">${name}</span></td>
-                    <td><span class="tag-length">${info.length}</span></td>
+                    <td><span class="tag-badge">${escapeHtml(tag)}</span></td>
+                    <td><span class="tag-name">${escapeHtml(name)}</span></td>
+                    <td><span class="tag-length">${parseInt(info.length, 10)}</span></td>
                     <td><span class="tag-value">${escapeHtml(info.value)}</span></td>
                 `;
                 tagsTbody.appendChild(tr);
@@ -705,10 +716,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const qrUrl = params.get('qr');
         if (!qrUrl) return;
 
+        // XSS Protection: Only allow safe URL protocols
+        try {
+            const parsed = new URL(qrUrl, window.location.origin);
+            if (!['http:', 'https:', 'data:'].includes(parsed.protocol)) return;
+        } catch (e) {
+            return; // Invalid URL
+        }
+
         // Switch to upload tab so decodedQRString is used on validate
         switchTab('upload');
 
-        showDecodeStatus('success', 'Đang xử lý ảnh QR...');
+        showDecodeStatusText('success', 'Đang xử lý ảnh QR...');
 
         const logoImg = document.getElementById('logo-qr-img');
 
@@ -737,7 +756,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const imageData = ctx.getImageData(0, 0, w, h);
 
                 if (typeof jsQR === 'undefined') {
-                    showDecodeStatus('error', 'jsQR library not loaded.');
+                    showDecodeStatusText('error', 'jsQR library not loaded.');
                     return;
                 }
 
@@ -758,10 +777,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         `QR decoded thành công:<span class="decoded-string">${escapeHtml(decodedQRString)}</span>`
                     );
                 } else {
-                    showDecodeStatus('error', 'Không thể decode QR từ ảnh. Thử paste chuỗi data thủ công.');
+                    showDecodeStatusText('error', 'Không thể decode QR từ ảnh. Thử paste chuỗi data thủ công.');
                 }
             }).catch(function (err) {
-                showDecodeStatus('error', 'Lỗi khi chụp ảnh: ' + err.message);
+                showDecodeStatusText('error', 'Lỗi khi chụp ảnh: ' + err.message);
             });
         }
 
@@ -771,7 +790,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             logoImg.addEventListener('load', captureAndDecode, { once: true });
             logoImg.addEventListener('error', () => {
-                showDecodeStatus('error', 'Không thể tải ảnh từ URL.');
+                showDecodeStatusText('error', 'Không thể tải ảnh từ URL.');
             }, { once: true });
         }
     })();

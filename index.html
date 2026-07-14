@@ -185,12 +185,24 @@
             const params = new URLSearchParams(window.location.search);
             const qrUrl = params.get('qr');
             if (qrUrl) {
+                // XSS Protection: Only allow safe URL protocols
+                let sanitizedUrl = '';
+                try {
+                    const parsed = new URL(qrUrl, window.location.origin);
+                    if (['http:', 'https:', 'data:'].includes(parsed.protocol)) {
+                        sanitizedUrl = parsed.href;
+                    }
+                } catch (e) {
+                    // Invalid URL — ignore
+                }
+                if (!sanitizedUrl) return;
+
                 const logoSvg = document.getElementById('logo-svg');
                 const logoQrImg = document.getElementById('logo-qr-img');
                 const logoContainer = document.getElementById('logo-container');
                 if (logoSvg) logoSvg.style.display = 'none';
                 if (logoQrImg) {
-                    logoQrImg.src = qrUrl;
+                    logoQrImg.src = sanitizedUrl;
                     logoQrImg.style.display = 'block';
                 }
                 // Adjust header layout for large QR image
