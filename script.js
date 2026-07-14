@@ -458,9 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (code) {
                 decodedQRString = code.data;
                 decodedBadge.style.display = 'inline-flex';
-                showDecodeStatus('success',
-                    `Successfully decoded QR data:<span class="decoded-string">${escapeHtml(decodedQRString)}</span>`
-                );
+                showDecodeStatusWithData('success', 'Successfully decoded QR data:', decodedQRString);
             } else {
                 // Try again with inversion
                 const codeInverted = jsQR(imageData.data, imageData.width, imageData.height, {
@@ -470,9 +468,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (codeInverted) {
                     decodedQRString = codeInverted.data;
                     decodedBadge.style.display = 'inline-flex';
-                    showDecodeStatus('success',
-                        `Successfully decoded QR data:<span class="decoded-string">${escapeHtml(decodedQRString)}</span>`
-                    );
+                    showDecodeStatusWithData('success', 'Successfully decoded QR data:', decodedQRString);
                 } else {
                     decodedQRString = '';
                     showDecodeStatusText('error', 'Could not detect a QR code in this image. Try a clearer image or paste the data string manually.');
@@ -482,21 +478,28 @@ document.addEventListener('DOMContentLoaded', () => {
         img.src = dataUrl;
     }
 
-    function showDecodeStatus(type, htmlContent) {
-        decodeStatus.style.display = 'block';
-        decodeStatus.className = `decode-status decode-${type}`;
-        // Use textContent for safety; callers that need rich content
-        // should pre-build escaped HTML via escapeHtml().
-        decodeStatus.innerHTML = htmlContent;
-    }
-
     /**
-     * Safe version: shows a plain-text status message (no HTML injection risk).
+     * Shows a plain-text status message (no HTML injection risk).
      */
     function showDecodeStatusText(type, message) {
         decodeStatus.style.display = 'block';
         decodeStatus.className = `decode-status decode-${type}`;
         decodeStatus.textContent = message;
+    }
+
+    /**
+     * Shows a status message with a highlighted data string (DOM-safe, no innerHTML).
+     */
+    function showDecodeStatusWithData(type, label, data) {
+        decodeStatus.style.display = 'block';
+        decodeStatus.className = `decode-status decode-${type}`;
+        decodeStatus.textContent = ''; // clear
+        const labelNode = document.createTextNode(label);
+        const dataSpan = document.createElement('span');
+        dataSpan.className = 'decoded-string';
+        dataSpan.textContent = data;
+        decodeStatus.appendChild(labelNode);
+        decodeStatus.appendChild(dataSpan);
     }
 
     // ==========================================
@@ -559,33 +562,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (result.valid) {
             resultCard.classList.add('success');
-            resultIcon.innerHTML = '✅';
+            resultIcon.textContent = '✅';
             resultTitle.textContent = 'Valid!';
             resultMessage.textContent = result.message;
         } else {
             resultCard.classList.add('error');
-            resultIcon.innerHTML = '❌';
+            resultIcon.textContent = '❌';
             resultTitle.textContent = 'Invalid';
             resultMessage.textContent = result.reason || result.message;
         }
 
         // Render checks summary if available
         if (result.checks) {
-            let checksHtml = '<div class="checks-list" style="margin-top:16px;">';
+            // Build checks list using DOM API (no innerHTML)
+            resultMessage.textContent = result.message || result.reason || '';
+
+            const checksList = document.createElement('div');
+            checksList.className = 'checks-list';
+            checksList.style.marginTop = '16px';
+
             result.checks.forEach(check => {
-                const icon = check.pass ? '✅' : '❌';
-                const color = check.pass ? 'var(--text-success)' : 'var(--text-error)';
-                checksHtml += `
-                    <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border-default);">
-                        <span style="flex-shrink:0;">${icon}</span>
-                        <div>
-                            <span style="font-weight:600;color:${color};font-size:0.85rem;">${escapeHtml(check.name)}</span>
-                            <span style="color:var(--text-muted);font-size:0.8rem;margin-left:8px;">${escapeHtml(check.detail)}</span>
-                        </div>
-                    </div>`;
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border-default);';
+
+                const iconSpan = document.createElement('span');
+                iconSpan.style.flexShrink = '0';
+                iconSpan.textContent = check.pass ? '✅' : '❌';
+
+                const textDiv = document.createElement('div');
+
+                const nameSpan = document.createElement('span');
+                nameSpan.style.cssText = `font-weight:600;color:${check.pass ? 'var(--text-success)' : 'var(--text-error)'};font-size:0.85rem;`;
+                nameSpan.textContent = check.name;
+
+                const detailSpan = document.createElement('span');
+                detailSpan.style.cssText = 'color:var(--text-muted);font-size:0.8rem;margin-left:8px;';
+                detailSpan.textContent = check.detail;
+
+                textDiv.appendChild(nameSpan);
+                textDiv.appendChild(detailSpan);
+                row.appendChild(iconSpan);
+                row.appendChild(textDiv);
+                checksList.appendChild(row);
             });
-            checksHtml += '</div>';
-            resultMessage.innerHTML = escapeHtml(result.message || result.reason || '') + checksHtml;
+
+            resultMessage.appendChild(checksList);
         }
 
         // Render PayNow Info Card
@@ -603,19 +624,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Render TLV table if data exists
         if (result.data) {
-            tagsTbody.innerHTML = '';
+            tagsTbody.textContent = '';
             const sortedTags = Object.keys(result.data).sort();
 
             sortedTags.forEach(tag => {
                 const info = result.data[tag];
                 const name = TAG_NAMES[tag] || '—';
                 const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td><span class="tag-badge">${escapeHtml(tag)}</span></td>
-                    <td><span class="tag-name">${escapeHtml(name)}</span></td>
-                    <td><span class="tag-length">${parseInt(info.length, 10)}</span></td>
-                    <td><span class="tag-value">${escapeHtml(info.value)}</span></td>
-                `;
+
+                const cells = [
+                    { cls: 'tag-badge', text: tag },
+                    { cls: 'tag-name', text: name },
+                    { cls: 'tag-length', text: String(parseInt(info.length, 10)) },
+                    { cls: 'tag-value', text: info.value },
+                ];
+
+                cells.forEach(cell => {
+                    const td = document.createElement('td');
+                    const span = document.createElement('span');
+                    span.className = cell.cls;
+                    span.textContent = cell.text;
+                    td.appendChild(span);
+                    tr.appendChild(td);
+                });
+
                 tagsTbody.appendChild(tr);
             });
 
@@ -625,11 +657,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
+
 
     // ==========================================
     // Render PayNow Info Card
@@ -679,33 +707,46 @@ document.addEventListener('DOMContentLoaded', () => {
         ];
 
         const validFields = fields.filter(f => f.value !== null);
+        const grid = document.getElementById('paynow-info-grid');
+        grid.textContent = ''; // clear safely
 
-        let html = '';
         validFields.forEach(f => {
-            let valueHtml;
+            // Build value span
+            const valueSpan = document.createElement('span');
             if (f.badge === 'editable') {
-                valueHtml = `<span class="pn-badge pn-badge-editable">${escapeHtml(f.value)}</span>`;
+                valueSpan.className = 'pn-badge pn-badge-editable';
             } else if (f.badge === 'fixed') {
-                valueHtml = `<span class="pn-badge pn-badge-fixed">${escapeHtml(f.value)}</span>`;
+                valueSpan.className = 'pn-badge pn-badge-fixed';
             } else if (f.mono) {
-                valueHtml = `<span class="pn-value pn-mono">${escapeHtml(f.value)}</span>`;
+                valueSpan.className = 'pn-value pn-mono';
             } else if (f.highlight) {
-                valueHtml = `<span class="pn-value pn-highlight">${escapeHtml(f.value)}</span>`;
+                valueSpan.className = 'pn-value pn-highlight';
             } else {
-                valueHtml = `<span class="pn-value">${escapeHtml(f.value)}</span>`;
+                valueSpan.className = 'pn-value';
             }
+            valueSpan.textContent = f.value;
 
-            html += `
-                <div class="pn-field">
-                    <span class="pn-icon">${f.icon}</span>
-                    <div class="pn-field-body">
-                        <span class="pn-label">${f.label}</span>
-                        ${valueHtml}
-                    </div>
-                </div>`;
+            // Build field container
+            const fieldDiv = document.createElement('div');
+            fieldDiv.className = 'pn-field';
+
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'pn-icon';
+            iconSpan.textContent = f.icon;
+
+            const bodyDiv = document.createElement('div');
+            bodyDiv.className = 'pn-field-body';
+
+            const labelSpan = document.createElement('span');
+            labelSpan.className = 'pn-label';
+            labelSpan.textContent = f.label;
+
+            bodyDiv.appendChild(labelSpan);
+            bodyDiv.appendChild(valueSpan);
+            fieldDiv.appendChild(iconSpan);
+            fieldDiv.appendChild(bodyDiv);
+            grid.appendChild(fieldDiv);
         });
-
-        document.getElementById('paynow-info-grid').innerHTML = html;
     }
 
     // ==========================================
@@ -733,7 +774,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         function captureAndDecode() {
             if (typeof html2canvas === 'undefined') {
-                showDecodeStatus('error', 'html2canvas library not loaded.');
+                showDecodeStatusText('error', 'html2canvas library not loaded.');
                 return;
             }
 
@@ -773,9 +814,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (code) {
                     decodedQRString = code.data;
                     decodedBadge.style.display = 'inline-flex';
-                    showDecodeStatus('success',
-                        `QR decoded thành công:<span class="decoded-string">${escapeHtml(decodedQRString)}</span>`
-                    );
+                    showDecodeStatusWithData('success', 'QR decoded thành công:', decodedQRString);
                 } else {
                     showDecodeStatusText('error', 'Không thể decode QR từ ảnh. Thử paste chuỗi data thủ công.');
                 }
